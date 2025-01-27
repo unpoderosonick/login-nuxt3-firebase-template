@@ -1,0 +1,38 @@
+[01;34m.[0m
+├── app.vue
+├── [01;34massets[0m
+│   └── [01;34mcss[0m
+│       └── main.css
+├── [01;34mcomponents[0m
+│   ├── [01;34mauth[0m
+│   │   └── LoginForm.vue
+│   └── Navbar.vue
+├── [01;34mcomposables[0m
+│   └── useAuth.js
+├── estructura_proyecto.txt
+├── [01;34mlayouts[0m
+│   └── default.vue
+├── [01;34mmiddleware[0m
+│   └── auth.js
+├── [01;34mmodules[0m
+│   └── [01;34mauth[0m
+│       └── [01;34mpages[0m
+├── nuxt.config.ts
+├── package.json
+├── [01;34mpages[0m
+│   ├── home.vue
+│   ├── index.vue
+│   ├── login.vue
+│   └── register.vue
+├── [01;34mplugins[0m
+│   └── firebase.client.js
+├── [01;34mpublic[0m
+│   ├── favicon.ico
+│   └── robots.txt
+├── README.md
+├── [01;34mserver[0m
+│   └── tsconfig.json
+├── tailwind.config.js
+└── tsconfig.json
+
+15 directories, 21 files
