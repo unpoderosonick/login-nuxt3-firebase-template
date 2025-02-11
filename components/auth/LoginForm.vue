@@ -49,33 +49,29 @@
   </div>
 </template>
 
-<script>
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+<script setup>
+import { useNuxtApp } from "#app";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { ref } from "vue";
 
-export default {
-  data() {
-    return {
-      email: "",
-      password: "",
-    };
-  },
-  methods: {
-    async handleSubmit() {
-      try {
-        const auth = getAuth();
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          this.email,
-          this.password
-        );
-        console.log("Usuario logeado:", userCredential.user);
-        // Redirigir al usuario a la página de inicio
-        this.$router.push("/home");
-      } catch (error) {
-        console.error("Error al iniciar sesión:", error.message);
-        alert("No se pudo iniciar sesión. Verifica tus credenciales.");
-      }
-    },
-  },
-};
+const email = ref("");
+const password = ref("");
+
+const { $auth } = useNuxtApp(); // <-- Aquí obtienes la instancia inyectada
+
+async function handleSubmit() {
+  try {
+    const userCredential = await signInWithEmailAndPassword(
+      $auth,
+      email.value,
+      password.value
+    );
+    console.log("Usuario logeado:", userCredential.user);
+    // Redirigir al usuario
+    useRouter().push("/home");
+  } catch (error) {
+    console.error("Error al iniciar sesión:", error.message);
+    alert("No se pudo iniciar sesión. Verifica tus credenciales.");
+  }
+}
 </script>
