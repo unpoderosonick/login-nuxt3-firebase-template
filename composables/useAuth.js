@@ -1,10 +1,13 @@
+// composables/useAuth.js
 import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
 } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { useRouter } from "vue-router";
 
 export function useAuth() {
   if (!process.client) {
@@ -24,9 +27,13 @@ export function useAuth() {
     };
   }
 
-  const token = useCookie("auth_token");
+  const token = useCookie("auth_token", {
+    maxAge: 60 * 60 * 24 * 7, // 7 días
+    sameSite: "lax",
+  });
   const auth = getAuth();
   const db = getFirestore();
+  const router = useRouter();
 
   const login = async (email, password) => {
     try {
@@ -36,6 +43,8 @@ export function useAuth() {
         password
       );
       token.value = await userCredential.user.getIdToken();
+      console.log("Usuario logeado:", userCredential.user);
+      router.push("/home"); // Redirigir al home después del login
       return userCredential.user;
     } catch (error) {
       console.error("Error en el inicio de sesión:", error.message);
@@ -50,6 +59,9 @@ export function useAuth() {
         email,
         password
       );
+      token.value = await userCredential.user.getIdToken();
+      console.log("Usuario registrado y logeado:", userCredential.user);
+      router.push("/home"); // Redirigir al home después del registro
       return userCredential.user;
     } catch (error) {
       console.error("Error al registrar:", error.message);
@@ -61,6 +73,8 @@ export function useAuth() {
     try {
       await signOut(auth);
       token.value = null;
+      console.log("Usuario deslogueado");
+      router.push("/login"); // Redirigir al login después del logout
     } catch (error) {
       console.error("Error al cerrar sesión:", error.message);
       throw error;
