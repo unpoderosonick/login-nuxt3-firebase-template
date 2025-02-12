@@ -1,5 +1,6 @@
 # Node modules
 node_modules/
+functions/node_modules/
 
 # Nuxt build directory
 .nuxt/
@@ -20,4 +21,9 @@ yarn-error.log*
 
 # Firebase emulators and cache
 .firebase/
-firebase-debug.log
+firebase-debug.log 
+
+# Google Cloud SDK
+google-cloud-sdk/
+google-cloud-sdk-*.tar.gz
+

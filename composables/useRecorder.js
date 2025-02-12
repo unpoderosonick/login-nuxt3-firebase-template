@@ -1,15 +1,36 @@
-// ~/composables/useRecorder.js
-
 import { ref } from "vue";
-import { getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { nanoid } from "nanoid";
 
-export function useRecorder() {
+/**
+ * useRecorder composable
+ * - Graba audio con MediaRecorder
+ * - Sube la grabación a Firebase Storage
+ * - Crea un documento en Firestore con la URL y metadatos
+ *
+ * Retorna:
+ *  - isRecording (ref)
+ *  - startRecording, stopRecording, toggleRecording
+ */
+export function useRecorder(userId) {
   let mediaRecorder = null;
   let audioChunks = [];
   const isRecording = ref(false);
 
-  // Iniciar grabación
+  /**
+   * Inicia la grabación solicitando permisos de audio
+   */
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -22,6 +43,7 @@ export function useRecorder() {
         }
       });
 
+      // Cuando se detiene la grabación, subimos el archivo
       mediaRecorder.addEventListener("stop", onRecordingStop);
 
       mediaRecorder.start();
@@ -33,7 +55,9 @@ export function useRecorder() {
     }
   }
 
-  // Detener grabación
+  /**
+   * Detiene la grabación (dispara 'stop')
+   */
   function stopRecording() {
     if (!mediaRecorder) return;
     mediaRecorder.stop();
@@ -41,37 +65,60 @@ export function useRecorder() {
     console.log("Grabación detenida.");
   }
 
-  // Al detener la grabación, subimos el archivo a Firebase Storage
+  /**
+   * Alterna entre iniciar y detener grabación
+   */
+  async function toggleRecording() {
+    if (!isRecording.value) {
+      await startRecording();
+    } else {
+      stopRecording();
+    }
+  }
+
+  /**
+   * Se dispara cuando finaliza la grabación:
+   * - Crea el Blob
+   * - Sube a Storage
+   * - Crea doc en Firestore
+   * - Retorna { id, downloadURL }
+   */
   async function onRecordingStop() {
     const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
     console.log("Audio Blob listo:", audioBlob);
 
-    // Subir a Firebase Storage
     try {
+      // 1) Subir a Firebase Storage
       const storage = getStorage();
       const fileName = `recordings/${nanoid()}.webm`;
       const fileRef = storageRef(storage, fileName);
       await uploadBytes(fileRef, audioBlob);
       console.log("Grabación subida a Storage:", fileName);
 
-      // Retornamos algún dato para que el componente decida
-      // Por ejemplo, un objeto con la ruta subido, etc.
+      // 2) Obtener la URL de descarga
+      const downloadURL = await getDownloadURL(fileRef);
+      console.log("downloadURL:", downloadURL);
+
+      // 3) Crear doc en Firestore
+      const db = getFirestore();
+      const recordingsCol = collection(db, "recordings");
+      const docRef = await addDoc(recordingsCol, {
+        downloadURL,
+        title: `Grabación ${new Date().toLocaleString()}`,
+        status: "ready",
+        createdAt: serverTimestamp(),
+        userId: userId || null,
+      });
+      console.log("Documento Firestore creado:", docRef.id);
+
+      // 4) Retornamos la info al componente
       return {
-        fileName,
-        blob: audioBlob,
+        id: docRef.id,
+        downloadURL,
       };
     } catch (error) {
-      console.error("Error subiendo a Firebase Storage:", error);
+      console.error("Error subiendo grabación a Firebase:", error);
       throw error;
-    }
-  }
-
-  // Toggle
-  async function toggleRecording() {
-    if (!isRecording.value) {
-      await startRecording();
-    } else {
-      stopRecording();
     }
   }
 
