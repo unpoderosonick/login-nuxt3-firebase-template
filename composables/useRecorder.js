@@ -91,10 +91,12 @@ export function useRecorder(userId) {
     const docRef = await addDoc(recordingsCol, {
       downloadURL,
       title: `Grabación ${new Date().toLocaleString()}`,
-      status: "ready",
+      statusLabel: "Subida", // Valor para mostrar en la UI
+      statusType: "ready", // Valor para lógica o estilos
       createdAt: serverTimestamp(),
       userId: userId || null,
     });
+
     console.log("Documento Firestore creado:", docRef.id);
 
     return {
