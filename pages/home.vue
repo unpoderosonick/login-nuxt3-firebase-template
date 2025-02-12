@@ -1,12 +1,10 @@
 <template>
-  <!-- Si la info de Firebase se está cargando, mostramos mensaje de carga -->
   <div
     v-if="isLoading"
     class="flex items-center justify-center h-screen text-center text-white bg-black">
     <p class="text-lg">Cargando...</p>
   </div>
 
-  <!-- De lo contrario, renderizamos la interfaz completa -->
   <div
     v-else
     class="relative flex flex-col min-h-screen overflow-hidden text-white bg-gradient-to-b from-black via-gray-900 to-black">
@@ -28,8 +26,8 @@
       @logout="handleLogout" />
 
     <!-- Contenido principal -->
-    <main class="relative z-10 flex-1 px-4 pt-4 pb-20">
-      <!-- Saludo con nombre de usuario de Firebase -->
+    <main class="relative z-0 flex-1 px-4 pt-4 pb-20">
+      <!-- Saludo con userName de Firebase -->
       <section class="mb-4">
         <h2
           class="text-3xl font-extrabold text-neon-pink mb-1 drop-shadow-[0_0_6px_rgba(255,0,127,0.8)]"
@@ -41,12 +39,12 @@
         </p>
       </section>
 
-      <!-- Barra de búsqueda (ejemplo) -->
+      <!-- Barra de búsqueda -->
       <section class="mb-6">
         <SearchBarCyberpunk v-model="searchTerm" />
       </section>
 
-      <!-- Lista de grabaciones (ejemplo, puedes quitar si no lo necesitas ahora) -->
+      <!-- Lista de grabaciones -->
       <section>
         <h3
           class="text-xl font-bold text-cyan-400 mb-4 drop-shadow-[0_0_6px_rgba(0,255,255,0.7)]"
@@ -64,39 +62,49 @@
       </section>
     </main>
 
-    <!-- Botón flotante para grabar -->
-    <div class="absolute bottom-16 right-6">
-      <FloatingRecordButton @record="startRecording" />
+    <!-- Botón flotante (z-50) -->
+    <div class="absolute z-50 bottom-16 right-6">
+      <FloatingRecordButton
+        :isRecording="isRecording"
+        @record="toggleRecording" />
     </div>
 
-    <!-- Efecto 'scan lines' (CRT) -->
+    <!-- Efecto scan lines -->
     <div
       class="pointer-events-none absolute top-0 left-0 w-full h-full bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:100%_2px] opacity-10"></div>
   </div>
 </template>
 
 <script setup>
-// Informa que se use el middleware 'auth' para proteger esta página
-definePageMeta({
-  middleware: "auth",
-});
-
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { definePageMeta, useRouter } from "#imports";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useAuth } from "~/composables/useAuth";
 
-// Para mostrar/ocultar el menú lateral
+// Nuestro composable de grabación
+import { useRecorder } from "~/composables/useRecorder.js";
+
+// COMPONENTES
+import HeaderCyberpunk from "~/components/HeaderCyberpunk.vue";
+import SideMenuCyberpunk from "~/components/SideMenuCyberpunk.vue";
+import SearchBarCyberpunk from "~/components/SearchBarCyberpunk.vue";
+import RecordingCard from "~/components/RecordingCard.vue";
+import FloatingRecordButton from "~/components/FloatingRecordButton.vue";
+
+// Protegemos la página con middleware auth
+definePageMeta({ middleware: "auth" });
+
+// side menu
 const showSideMenu = ref(false);
 function toggleSideMenu() {
   showSideMenu.value = !showSideMenu.value;
 }
 
-// Nombre de usuario y estado de carga
-const userName = ref("Usuario desconocido");
+// loading + userName (Firebase)
 const isLoading = ref(true);
+const userName = ref("Usuario desconocido");
 
-// Al montarse el componente, detectamos si hay usuario logueado
+// Al montar, escuchamos Auth
 onMounted(() => {
   const auth = getAuth();
   onAuthStateChanged(auth, (user) => {
@@ -109,11 +117,9 @@ onMounted(() => {
   });
 });
 
-// Obtenemos la función logout desde nuestro composable
+// Logout
 const { logout } = useAuth();
 const router = useRouter();
-
-// Manejo del logout (se llamará desde SideMenuCyberpunk con @logout="handleLogout")
 async function handleLogout() {
   try {
     await logout();
@@ -124,39 +130,37 @@ async function handleLogout() {
   }
 }
 
-// Lógica de búsqueda (ejemplo)
+// Búsqueda + grabaciones (ejemplo)
 const searchTerm = ref("");
+const recordings = ref([]);
 
-// Grabaciones de ejemplo (puedes cargarlas de Firestore o tu API en otro onMounted)
-const recordings = ref([
-  // { id: 'abc', title: 'Reunión de Ventas', statusLabel: 'Transcripción lista', statusType: 'ready' },
-  // { id: 'def', title: 'Proyecto Alpha', statusLabel: 'Procesando...', statusType: 'processing' },
-]);
-
-// Computed para filtrar grabaciones
 const filteredRecordings = computed(() => {
   if (!searchTerm.value) return recordings.value;
-  return recordings.value.filter((record) =>
-    record.title.toLowerCase().includes(searchTerm.value.toLowerCase())
+  return recordings.value.filter((r) =>
+    r.title.toLowerCase().includes(searchTerm.value.toLowerCase())
   );
 });
 
-// Acciones de grabaciones
 function goToRecording(record) {
-  // Podrías hacer: router.push(`/recording/${record.id}`)
-  alert(`Abrir detalle de: ${record.title}`);
+  alert(`Detalle de la grabación: ${record.title}`);
 }
 
-// Iniciar grabación
-function startRecording() {
-  alert("Iniciando grabación...");
-}
+// ============== USE RECORDER ===============
+const { isRecording, toggleRecording, startRecording, stopRecording } =
+  useRecorder();
+
+/**
+ * Si deseas, podrías “enganchar” el momento en que
+ * se sube la grabación y hacer algo con la respuesta
+ * (p.ej. meter un nuevo recording en la lista).
+ *
+ * Para ello, ajusta `onRecordingStop()` dentro del composable
+ * para que retorne un objeto, y aquí lo capturas.
+ */
 </script>
 
 <style scoped>
-/* Si deseas estilos personalizados extra:
 .text-neon-pink {
   color: #ff00b3;
 }
-*/
 </style>

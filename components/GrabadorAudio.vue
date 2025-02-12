@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { useAudioRecorder } from "~/composables/useAudioRecorder.js";
+import { useAudioRecorder } from "~/composables/useRecorder.js";
 
 // Emite 'audioReady' cuando pare la grabación
 const emit = defineEmits(["audioReady"]);
