@@ -9,19 +9,19 @@
     title="Grabar nueva reunión"
     @click="onClick">
     <!-- Ícono micrófono si no está grabando -->
+
     <svg
       v-if="!isRecording"
-      class="w-7 h-7"
+      xmlns="http://www.w3.org/2000/svg"
       fill="none"
+      viewBox="0 0 24 24"
+      stroke-width="1.5"
       stroke="currentColor"
-      viewBox="0 0 24 24">
+      class="size-8">
       <path
         stroke-linecap="round"
         stroke-linejoin="round"
-        stroke-width="2"
-        d="M12 1v10m0 0a3 3 0 006 0V5
-               a3 3 0 00-6 0zM5 10v2a7 7 0 0014 0v-2
-               M12 19v4m-4 0h8" />
+        d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
     </svg>
 
     <!-- Ícono stop si está grabando -->
