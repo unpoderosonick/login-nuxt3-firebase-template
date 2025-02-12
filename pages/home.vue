@@ -1,12 +1,12 @@
 <template>
-  <!-- Si la info del usuario sigue cargando -->
+  <!-- Pantalla de carga -->
   <div
     v-if="isLoading"
     class="flex items-center justify-center h-screen text-center text-white bg-black">
     <p class="text-lg">Cargando...</p>
   </div>
 
-  <!-- Pantalla principal: estilo cyberpunk -->
+  <!-- Pantalla principal (cyberpunk) -->
   <div
     v-else
     class="relative flex flex-col min-h-screen overflow-hidden text-white bg-gradient-to-b from-black via-gray-900 to-black">
@@ -18,18 +18,17 @@
     <div
       class="absolute bottom-0 right-0 w-1 h-1/3 bg-pink-400 blur-[1px]"></div>
 
-    <!-- Header: Título y botón “JP” -->
+    <!-- Header principal -->
     <HeaderCyberpunk @toggleMenu="toggleSideMenu" />
 
-    <!-- Menú Lateral (SideMenuCyberpunk) -->
+    <!-- Menú Lateral -->
     <SideMenuCyberpunk
       :showMenu="showSideMenu"
       @close="toggleSideMenu"
       @logout="handleLogout" />
 
-    <!-- Contenido principal, z-0 para que el botón flotante se superponga -->
+    <!-- Contenido principal -->
     <main class="relative z-0 flex-1 px-4 pt-4 pb-20">
-      <!-- Saludo con userName (Firebase Auth) -->
       <section class="mb-4">
         <h2
           class="text-3xl font-extrabold text-neon-pink mb-1 drop-shadow-[0_0_6px_rgba(255,0,127,0.8)]"
@@ -54,7 +53,6 @@
           Últimas Grabaciones
         </h3>
 
-        <!-- Cada grabación se muestra en un RecordingCard -->
         <RecordingCard
           v-for="record in filteredRecordings"
           :key="record.id"
@@ -65,11 +63,12 @@
       </section>
     </main>
 
-    <!-- Botón flotante para grabar (z-50 para quedar sobre el contenido) -->
+    <!-- Botón flotante para grabar -->
     <div class="absolute z-50 bottom-16 right-6">
+      <!-- Se usa la propiedad computada para enviar un booleano -->
       <FloatingRecordButton
-        :isRecording="isRecording"
-        @record="toggleRecording" />
+        :isRecording="isRecordingComputed"
+        @record="toggleRecordingWrapper" />
     </div>
 
     <!-- Efecto 'scan lines' (CRT) -->
@@ -83,48 +82,111 @@ import { ref, computed, onMounted } from "vue";
 import { definePageMeta, useRouter } from "#imports";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useAuth } from "~/composables/useAuth";
-
-// Nuestro composable de grabación
 import { useRecorder } from "~/composables/useRecorder.js";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 
-// Componentes
+// Componentes de la interfaz
 import HeaderCyberpunk from "~/components/HeaderCyberpunk.vue";
 import SideMenuCyberpunk from "~/components/SideMenuCyberpunk.vue";
 import SearchBarCyberpunk from "~/components/SearchBarCyberpunk.vue";
 import RecordingCard from "~/components/RecordingCard.vue";
 import FloatingRecordButton from "~/components/FloatingRecordButton.vue";
 
-// Proteger la ruta con middleware "auth"
+// Protegemos la ruta con middleware 'auth'
 definePageMeta({ middleware: "auth" });
 
-// Control del menú lateral
+/* ----------------- Variables reactivas y funciones de UI ----------------- */
 const showSideMenu = ref(false);
 function toggleSideMenu() {
   showSideMenu.value = !showSideMenu.value;
 }
 
-// Estado de carga + nombre del usuario
 const isLoading = ref(true);
 const userName = ref("Usuario desconocido");
+const searchTerm = ref("");
+const recordings = ref([]);
 let currentUserUid = null;
+let recorder = null;
+let unsubscribeFn = null;
 
-// Al montar, verificamos la autenticación
+const filteredRecordings = computed(() => {
+  if (!searchTerm.value) return recordings.value;
+  return recordings.value.filter((r) =>
+    r.title.toLowerCase().includes(searchTerm.value.toLowerCase())
+  );
+});
+
+/* ----------------- Autenticación y suscripción ----------------- */
 onMounted(() => {
   const auth = getAuth();
   onAuthStateChanged(auth, (user) => {
     if (user) {
       userName.value = user.displayName || user.email || "Usuario";
       currentUserUid = user.uid;
+
+      // Instanciamos el recorder cuando ya tenemos el UID
+      recorder = useRecorder(currentUserUid);
+      // Suscribimos a Firestore para mostrar las grabaciones del usuario
+      subscribeToRecordings();
     } else {
       userName.value = "Invitado";
+      currentUserUid = null;
+      recordings.value = [];
+      recorder = null;
     }
     isLoading.value = false;
   });
 });
 
-// Logout
+/* ----------------- Propiedad Computada ----------------- */
+// Esta propiedad extrae el valor booleano del ref interno recorder.isRecording
+const isRecordingComputed = computed(() => {
+  return recorder ? recorder.isRecording.value : false;
+});
+
+/* ----------------- Firestore: Suscripción a grabaciones ----------------- */
+function subscribeToRecordings() {
+  if (unsubscribeFn) unsubscribeFn(); // Cancelamos suscripción previa
+  if (!currentUserUid) return;
+
+  const db = getFirestore();
+  const colRef = collection(db, "recordings");
+  const qRef = query(
+    colRef,
+    where("userId", "==", currentUserUid),
+    orderBy("createdAt", "desc")
+  );
+
+  unsubscribeFn = onSnapshot(
+    qRef,
+    (snapshot) => {
+      recordings.value = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          statusLabel: "Subida",
+          statusType: "ready",
+          ...data,
+        };
+      });
+    },
+    (err) => {
+      console.error("onSnapshot error =>", err);
+    }
+  );
+}
+
+/* ----------------- Logout y Navegación ----------------- */
 const { logout } = useAuth();
 const router = useRouter();
+
 async function handleLogout() {
   try {
     await logout();
@@ -135,63 +197,34 @@ async function handleLogout() {
   }
 }
 
-// Búsqueda y almacenamiento local de grabaciones
-const searchTerm = ref("");
-const recordings = ref([]);
-
-// Filtrar por título
-const filteredRecordings = computed(() => {
-  if (!searchTerm.value) return recordings.value;
-  return recordings.value.filter((r) =>
-    r.title.toLowerCase().includes(searchTerm.value.toLowerCase())
-  );
-});
-
-// Navegar a vista de detalle (opcional, no implementado aquí)
+/* ----------------- Funciones de interacción ----------------- */
 function goToRecording(record) {
-  alert(`Abrir detalle de: ${record.title}`);
-  // router.push(`/recording/${record.id}`)
+  // Aquí podrías redirigir a una vista de detalle de la grabación
+  alert(`Detalle de la grabación: ${record.title}`);
 }
 
-// ========== LÓGICA DE GRABACIÓN (COMPOSABLE) ==========
+async function toggleRecordingWrapper() {
+  if (!recorder) {
+    console.warn("No se ha instanciado el recorder porque no hay uid.");
+    return;
+  }
 
-// Pasamos el userId (opcional) para que se guarde en Firestore
-const { isRecording, startRecording, stopRecording, toggleRecording } =
-  useRecorder(currentUserUid);
-
-// Reemplazamos la función toggleRecording para “inyectar” la parte
-// donde añadimos la nueva grabación localmente cuando termina
-async function toggleRecordingOverride() {
-  // Llamamos a la función original
-  await toggleRecording();
-
-  // Si paramos la grabación, "onRecordingStop" se dispara en el composable,
-  // sube el archivo, crea doc en Firestore y retorna { id, downloadURL }.
-  // Para capturar eso, podemos interceptar la promesa en "stopRecording"
-  // y retornarla. Sin embargo, MediaRecorder "stop" es un evento asíncrono.
-
-  // Una forma es sobrescribir "stopRecording" en el composable para que
-  // retorne la data. O "emitir" un custom event.
-  // Con la API actual, "onRecordingStop" no expone un callback.
-  // Para hacerlo simple, podemos "escuchar" un event en el composable
-  // o meter la lógica aquí.
-  // => EJEMPLO rápido: Forzamos un setTimeout y consultamos Firestore
-  // a posteriori. (No ideal, pero demostratvo.)
-}
-
-// En este ejemplo, para no complicar,
-// usaremos "toggleRecording" tal cual, sin interceptar.
-// **Si** quieres ver la nueva grabación al instante,
-// lo ideal es "emitir" un custom event cuando se cree el doc en Firestore
-// o hacer un "setInterval" para re-consultar las grabaciones.
-
-// Por simplicidad, lo dejaremos así.
-// De todas formas, "toggleRecording"
-// ya sube la grabación y crea el doc.
-
-// Reemplaza en el template:
-function toggleRecordingWrapper() {
-  toggleRecordingOverride();
+  // Si no está grabando, inicia; de lo contrario, detiene la grabación
+  if (!recorder.isRecording.value) {
+    await recorder.toggleRecording();
+  } else {
+    const result = await recorder.toggleRecording();
+    if (result && result.id && result.downloadURL) {
+      // Agregamos la grabación a la lista para mostrarla inmediatamente
+      recordings.value.unshift({
+        id: result.id,
+        title: `Grabación ${new Date().toLocaleString()}`,
+        downloadURL: result.downloadURL,
+        statusLabel: "Subida",
+        statusType: "ready",
+      });
+    }
+  }
 }
 </script>
 
