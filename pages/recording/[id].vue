@@ -40,21 +40,22 @@
       <!-- Tarjeta de detalles -->
       <div
         class="p-6 mb-8 border rounded-lg shadow-2xl bg-black/30 backdrop-blur-lg border-pink-500/50">
-        <!-- Reproductor de audio -->
+        <!-- Reproductor de audio (sin estilos personalizados) -->
         <div class="mb-6">
           <audio
             v-if="recordingData.downloadURL"
             :src="recordingData.downloadURL"
             controls
-            class="w-full rounded-lg bg-gray-900/50"></audio>
+            class="w-full"></audio>
         </div>
 
-        <!-- Metadatos -->
-        <div class="grid gap-4 mb-6 text-sm md:grid-cols-2">
+        <!-- Metadatos compactos -->
+        <div class="flex gap-4 mb-6 text-sm">
           <div class="p-3 rounded-md bg-gray-900/20">
             <p class="text-cyan-400">Estado:</p>
             <p :class="statusColorClass" class="font-semibold">
-              {{ recordingData.statusLabel || "Desconocido" }}
+              {{ recordingData.statusLabel || "Subida" }}
+              <!-- Valor por defecto corregido -->
             </p>
           </div>
 
@@ -66,14 +67,60 @@
           </div>
         </div>
 
-        <!-- Transcripción -->
+        <!-- Barra de búsqueda -->
+        <div class="mb-6">
+          <SearchBarCyberpunk v-model="searchTerm" @search="highlightMatches" />
+        </div>
+
+        <!-- Resumen y Acuerdos (sección unificada) -->
+        <div class="mb-6">
+          <h2 class="mb-3 text-lg font-bold text-cyan-400">
+            Resumen y Acuerdos
+          </h2>
+          <div
+            v-if="
+              recordingData.summary ||
+              (recordingData.tasks && recordingData.tasks.length > 0)
+            "
+            class="p-4 rounded-md bg-gray-900/20">
+            <!-- Resumen -->
+            <div v-if="recordingData.summary" class="mb-4">
+              <p class="text-sm leading-relaxed text-white/80">
+                {{ recordingData.summary }}
+              </p>
+            </div>
+
+            <!-- Acuerdos y tareas -->
+            <div
+              v-if="recordingData.tasks && recordingData.tasks.length > 0"
+              class="space-y-2">
+              <div
+                v-for="(task, index) in recordingData.tasks"
+                :key="index"
+                class="flex items-center p-3 rounded-md bg-gray-900/30">
+                <input
+                  type="checkbox"
+                  v-model="task.completed"
+                  class="mr-3 text-pink-400 rounded focus:ring-pink-500" />
+                <p class="text-sm text-white/80">{{ task.description }}</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="p-4 text-center rounded-md bg-gray-900/20">
+            <p class="text-white/60">No hay resumen ni acuerdos disponibles</p>
+          </div>
+        </div>
+
+        <!-- Transcripción con resaltado -->
         <div
           v-if="recordingData.transcript"
           class="p-4 rounded-md bg-gray-900/20">
-          <h2 class="mb-3 text-lg font-bold text-cyan-400">Transcripción</h2>
-          <p class="font-mono text-sm leading-relaxed text-white/80">
-            {{ recordingData.transcript }}
-          </p>
+          <h2 class="mb-3 text-lg font-bold text-cyan-400">
+            Transcripción Completa
+          </h2>
+          <p
+            class="font-mono text-sm leading-relaxed text-white/80"
+            v-html="highlightedTranscript"></p>
         </div>
 
         <!-- Mensaje si no hay transcripción -->
@@ -90,8 +137,11 @@
 </template>
 
 <script setup>
-import { useRouter } from "#imports";
+import { ref, computed } from "vue";
+import { useRoute, useRouter } from "#imports";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import SearchBarCyberpunk from "~/components/SearchBarCyberpunk.vue";
+import { useSearchTranscript } from "~/composables/useSearchTranscript";
 
 const route = useRoute();
 const router = useRouter();
@@ -99,6 +149,7 @@ const recordingId = route.params.id;
 
 const isLoading = ref(true);
 const recordingData = ref({});
+const searchTerm = ref("");
 
 // Color según estado
 const statusColorClass = computed(() => {
@@ -121,6 +172,12 @@ const formatDate = (date) => {
   }).format(date);
 };
 
+// Composable para buscar en la transcripción
+const { highlightedTranscript } = useSearchTranscript(
+  recordingData,
+  searchTerm
+);
+
 // Cargar datos
 onMounted(async () => {
   try {
@@ -129,7 +186,18 @@ onMounted(async () => {
     const snapshot = await getDoc(docRef);
 
     if (snapshot.exists()) {
-      recordingData.value = snapshot.data();
+      const data = snapshot.data();
+      recordingData.value = {
+        id: snapshot.id,
+        title: data.title || `Grabación ${new Date().toLocaleString()}`,
+        downloadURL: data.downloadURL || "",
+        statusLabel: data.statusLabel || "Subida", // Valor por defecto corregido
+        statusType: data.statusType || "ready", // Valor por defecto corregido
+        createdAt: data.createdAt,
+        transcript: data.transcript || "",
+        summary: data.summary || "",
+        tasks: data.tasks || [],
+      };
     }
   } catch (error) {
     console.error("Error cargando grabación:", error);
@@ -144,14 +212,5 @@ onMounted(async () => {
 
 .text-neon-pink {
   color: #ff00b3;
-}
-
-audio::-webkit-media-controls-panel {
-  background-color: rgba(17, 24, 39, 0.5);
-}
-
-audio::-webkit-media-controls-play-button,
-audio::-webkit-media-controls-mute-button {
-  filter: drop-shadow(0 0 2px #ff00b3);
 }
 </style>
