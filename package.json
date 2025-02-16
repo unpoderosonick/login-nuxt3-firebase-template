@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@nuxtjs/dotenv": "^1.4.2",
+    "@vite-pwa/nuxt": "^0.10.6",
     "firebase": "^11.3.0",
+    "idb-keyval": "^6.2.1",
     "nuxt": "^3.14.1592",
     "vue": "latest",
     "vue-router": "latest"
